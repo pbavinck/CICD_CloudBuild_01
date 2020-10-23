@@ -1,0 +1,7 @@
+.vscode
+.mynotes.txt
+.DS_Store
+
+Dockerfile *
+go.mod *
+*.log

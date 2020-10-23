@@ -1,0 +1,33 @@
+body {
+  font-family: "Roboto";
+  font-size: 18px;
+  line-height: 30px;
+  padding-top: 64px;
+  text-align: center;
+  color: #5f6368;
+}
+h1,
+h2,
+h3 {
+  font-family: "Google sans";
+}
+h1 {
+  font-size: 56px;
+  color: #202124;
+}
+h3 {
+  margin-top: 64px;
+  font-size: 36px;
+  color: #1a73e8;
+}
+#cloud_logo {
+  width: 64px;
+  height: 64px;
+  /* vertical-align: middle;
+      margin-left: 10px; */
+}
+
+#logo {
+  width: 256px;
+  /* height: 128px; */
+}
