@@ -262,7 +262,7 @@ EOF
 
 Not only does Cloud Build need to be able to add these notes to Container Analysis, Cloud Build also needs to have permission to use the private key of the `vulnz-signer` key pair to properly sign (protect) them:
 
-```
+```bash
 gcloud kms keys add-iam-policy-binding "vulnz-signer" \
   --project "${PROJECT_ID}" \
   --location "${REGION}" \
