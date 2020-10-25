@@ -188,26 +188,9 @@ gcloud builds submit --config="./cloudbuild/03-anthos_manual_1.yaml"
 
 Next in the [demo](https://cloud.google.com/solutions/binary-auth-with-cloud-build-and-gke#creating_signing_keys) is the signing keys for Cloud Build. In our simplified demo we will only use the vulnarability check (vulnz-signer) and not the quality assurance (qa-signer) check.
 
-## Set up key pair for signing and verifying
-
-Create the key ring and the signer / verifier key pair:
-
-```bash
-gcloud kms keyrings create "binauthz" \
-  --project "${PROJECT_ID}" \
-  --location "${REGION}"
-
-gcloud kms keys create "vulnz-signer" \
-  --project "${PROJECT_ID}" \
-  --location "${REGION}" \
-  --keyring "binauthz" \
-  --purpose "asymmetric-signing" \
-  --default-algorithm "rsa-sign-pkcs1-4096-sha512"
-```
-
 ## Set up attestation definition (note)
 
-Next part is to create a note (definition) which is used by some code initiated by Cloud Build to attest that no significant vulnaribilites were found. In this demo Cloud Build functions as both the creator of this attestation (signing with private key) as well as the attestor that checks whether the proper attestation exists (verifying with public key).
+Next part is to create a note (definition) which is used by some code executed by Cloud Build to attest that no significant vulnaribilites were found. The note occurence (attestation) is signed with a private key. At deployment time Binary Authorization will use an Attestor for this note definition to verify created attestations using the public key.
 
 ```bash
 curl "https://containeranalysis.googleapis.com/v1/projects/${PROJECT_ID}/notes/?noteId=vulnz-note" \
@@ -227,9 +210,35 @@ curl "https://containeranalysis.googleapis.com/v1/projects/${PROJECT_ID}/notes/?
 EOF
 ```
 
-### Signing rights
+## Set up key pair for signing and verifying
 
-Grant the Cloud Build service account permission to view and attach the `vulnz-note` note to container images:
+Create the key ring and the signer / verifier key pair:
+
+```bash
+gcloud kms keyrings create "binauthz" \
+  --project "${PROJECT_ID}" \
+  --location "${REGION}"
+
+gcloud kms keys create "vulnz-signer" \
+  --project "${PROJECT_ID}" \
+  --location "${REGION}" \
+  --keyring "binauthz" \
+  --purpose "asymmetric-signing" \
+  --default-algorithm "rsa-sign-pkcs1-4096-sha512"
+```
+
+## Signing rights
+
+When Cloud Build wants to sign an image (create an attestation in the script 'create*attestaion.sh') the associated [gcloud command](https://cloud.google.com/sdk/gcloud/reference/alpha/container/binauthz/attestations/sign-and-create) requires the Attestor resource as one of its parameters. The command needs to verify the existence of the Attestor and retrieve its information. Therefore we give it the role \_attestorsViewer* on the Attestor resource `vulnz-attestor`:
+
+```bash
+gcloud container binauthz attestors add-iam-policy-binding "vulnz-attestor" \
+  --project "${PROJECT_ID}" \
+  --member "serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
+  --role "roles/binaryauthorization.attestorsViewer"
+```
+
+Secondly, the Cloud Build service account needs permission to view and attach the `vulnz-note` note to container images:
 
 ```bash
 curl "https://containeranalysis.googleapis.com/v1beta1/projects/${PROJECT_ID}/notes/vulnz-note:setIamPolicy" \
@@ -260,7 +269,7 @@ curl "https://containeranalysis.googleapis.com/v1beta1/projects/${PROJECT_ID}/no
 EOF
 ```
 
-Not only does Cloud Build need to be able to add these notes to Container Analysis, Cloud Build also needs to have permission to use the private key of the `vulnz-signer` key pair to properly sign (protect) them:
+And lastly, Cloud Build needs to have permission to use the private key of the `vulnz-signer` key pair to properly sign (protect) the notes:
 
 ```bash
 gcloud kms keys add-iam-policy-binding "vulnz-signer" \
@@ -271,9 +280,9 @@ gcloud kms keys add-iam-policy-binding "vulnz-signer" \
   --role 'roles/cloudkms.signerVerifier'
 ```
 
-### Verifying rights as attestor
+## Attestor rights
 
-Binary Authorization works with a concept called attestors. These attestors validate that certain attestations exist in Container Analysis storage. By adding attestors to your Binary Authorization policy, which is then applied to a cluster, you protect the cluster from running containers that don't have all the necessary attestation.
+Binary Authorization works with a concept called attestors. These attestors validate that certain attestations exist in Container Analysis storage. By adding attestors to your Binary Authorization policy, which is then applied to a cluster, you protect the cluster from running containers that don't have all the necessary attestations.
 
 Create the vulnerability scan attestor. This attestor will check whether the vulz-note attestation exists for newly created images.
 
@@ -296,15 +305,6 @@ gcloud beta container binauthz attestors public-keys add \
   --keyversion-keyring "binauthz" \
   --keyversion-location "${REGION}" \
   --keyversion-project "${PROJECT_ID}"
-```
-
-Grant the Cloud Build service account permission to act as the `vulnz-attestor` and verify the attestation:
-
-```bash
-gcloud container binauthz attestors add-iam-policy-binding "vulnz-attestor" \
-  --project "${PROJECT_ID}" \
-  --member "serviceAccount:${CLOUD_BUILD_SA_EMAIL}" \
-  --role "roles/binaryauthorization.attestorsVerifier"
 ```
 
 ## Set up Binary Authorization policy
@@ -416,7 +416,7 @@ RUN apt-get update -qq &&\
 Try to deploy an unauthorized image to cluster and investigate the reponse highlighting this is forbidden:
 
 ```
-$kubectl run --generator=run-pod/v1 hello-server --image gcr.io/google-samples/hello-app:1.0 --port 8080
+$kubectl run --generator=run-pod/v1 hello-server --image gcr.io/google-samples/hello-app@sha256:c62ead5b8c15c231f9e786250b07909daf6c266d0fcddd93fea882eb722c3be4 --port 8080
 
-Error from server (Forbidden): pods "hello-server" is forbidden: image policy webhook backend denied one or more images: Denied by cluster admission rule for europe-west1-c.ci-cd-demo. Denied by Attestor. Image gcr.io/google-samples/hello-app:1.0 denied by projects/<<REDACTED>>/attestors/vulnz-attestor: Expected digest with sha256 scheme, but got tag or malformed digest
+Error from server (Forbidden): pods "hello-server" is forbidden: image policy webhook backend denied one or more images: Denied by cluster admission rule for europe-west1-c.ci-cd-demo. Denied by Attestor. Image gcr.io/google-samples/hello-app@sha256:c62ead5b8c15c231f9e786250b07909daf6c266d0fcddd93fea882eb722c3be4 denied by projects/<REDACTED>/attestors/vulnz-attestor: No attestations found that were valid and signed by a key trusted by the attestor
 ```
