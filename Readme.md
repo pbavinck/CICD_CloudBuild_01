@@ -116,6 +116,8 @@ The second demo focusses on
 
 The setup is a simplified version of [this demo](https://cloud.google.com/solutions/binary-auth-with-cloud-build-and-gke). Instead of a staging and production cluster we are using a simplified version with only one GKE cluster.
 
+![alt text](docs/demo2_flow.png)
+
 Like before, we start by doing the deployment step by step manually, followed by an automated pipeline powered by [Cloud Build](https://cloud.google.com/cloud-build/docs).
 
 _If you don't want to trigger the build to managed [Cloud Run](https://cloud.google.com/run/docs) during this demo, you can temporarily disable the trigger in the console under Cloud Build -> Triggers and clicking the three vertical dots next to your trigger._
@@ -419,7 +421,7 @@ RUN apt-get update -qq &&\
 #...
 ```
 
-The failing deployment is not caused by [Binary Authorization](https://cloud.google.com/binary-authorization/docs) and the attestation process. The scripts retrieves a list of found vulnarabilities (which by the way are stored in [Container Analysis](https://cloud.google.com/container-registry/docs/container-analysis)) and finds that these exceed a cartain threshold. By returning an error in this case, [Cloud Build](https://cloud.google.com/cloud-build/docs) will stop the pipeline.
+The failing deployment is not caused by [Binary Authorization](https://cloud.google.com/binary-authorization/docs) and the attestation process. The `check_vulnerabilities.sh` script (from the `binauthz-tools` repo) retrieves a list of found vulnarabilities (which by the way are stored in [Container Analysis](https://cloud.google.com/container-registry/docs/container-analysis)) and finds that these exceed a cartain threshold. By returning an error in this case, [Cloud Build](https://cloud.google.com/cloud-build/docs) will stop the pipeline.
 
 ### Deploy without Cloud Build (and hence no attestation)
 
