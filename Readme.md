@@ -141,7 +141,7 @@ gcloud container clusters create ${CLUSTER} \
 Gain credentials to manipulate the cluster from command line:
 
 ```bash
-gcloud container clusters get-credentials ${CLUSTER}
+gcloud container clusters get-credentials ${CLUSTER} --zone=$ZONE
 ```
 
 ## Deploy to Cloud Run on Anthos
@@ -427,8 +427,8 @@ The failing deployment is not caused by [Binary Authorization](https://cloud.goo
 
 Try to deploy an unauthorized image to cluster and investigate the reponse highlighting this is forbidden:
 
-```
-$kubectl run --generator=run-pod/v1 hello-server --image gcr.io/google-samples/hello-app@sha256:c62ead5b8c15c231f9e786250b07909daf6c266d0fcddd93fea882eb722c3be4 --port 8080
+```Shell
+$ kubectl run hello-server --generator=run-pod/v1 --port 8080 --image gcr.io/google-samples/hello-app@sha256:c62ead5b8c15c231f9e786250b07909daf6c266d0fcddd93fea882eb722c3be4
 
 Error from server (Forbidden): pods "hello-server" is forbidden: image policy webhook backend denied one or more images: Denied by cluster admission rule for europe-west1-c.ci-cd-demo. Denied by Attestor. Image gcr.io/google-samples/hello-app@sha256:c62ead5b8c15c231f9e786250b07909daf6c266d0fcddd93fea882eb722c3be4 denied by projects/<REDACTED>/attestors/vulnz-attestor: No attestations found that were valid and signed by a key trusted by the attestor
 ```
