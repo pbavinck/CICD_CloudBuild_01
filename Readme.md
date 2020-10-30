@@ -116,7 +116,7 @@ The second demo focusses on
 
 The setup is a simplified version of [this demo](https://cloud.google.com/solutions/binary-auth-with-cloud-build-and-gke). Instead of a staging and production cluster we are using a simplified version with only one GKE cluster.
 
-![alt text](docs/demo2_flow.png)
+![alt text](docs/demo2a_flow.png)
 
 Like before, we start by doing the deployment step by step manually, followed by an automated pipeline powered by [Cloud Build](https://cloud.google.com/cloud-build/docs).
 
@@ -184,10 +184,10 @@ Then, navigate your browser to http://anthos-demo.default.example.com:
 
 Now, let's enhance the manual [Cloud Build](https://cloud.google.com/cloud-build/docs) deployment by including an additional step for executing a simple unit test and cancel the deployment when the test fails (which happens automatically, because the test returns an exit code other than 0 on failure).
 
-In the file `/cloudrun/03-anthos_manual_1.yaml` you find the build pipeline with the unit test included. Let execute this pipeline with the same command as before, but now referening the new config file.
+In the file `/cloudrun/03-anthos_manual.yaml` you find the build pipeline with the unit test included. Let execute this pipeline with the same command as before, but now referening the new config file.
 
 ```bash
-gcloud builds submit --config="./cloudbuild/03-anthos_manual_1.yaml"
+gcloud builds submit --config="./cloudbuild/03-anthos_manual.yaml"
 ```
 
 # Using Binary Authorisation
@@ -356,15 +356,16 @@ git clone https://github.com/GoogleCloudPlatform/gke-binary-auth-tools
 
 To use this code in [Cloud Build](https://cloud.google.com/cloud-build/docs) we build a container for it and reference it in our [Cloud Build](https://cloud.google.com/cloud-build/docs) custom steps. Then we call specifc commands and code in the container by passing arguments to the container's entrypoint.
 
-Build and push the container to our Container Registry by executing the following command from your `binauthz-tools` folder:
+Build and push the container to our [Container Registry](https://cloud.google.com/container-registry/docs) by executing the following command from your new `binauthz-tools` folder:
 
 ```bash
 gcloud builds submit \
   --project "${PROJECT_ID}" \
   --tag "gcr.io/${PROJECT_ID}/cloudbuild-attestor" \
+  .
 ```
 
-Now we are ready to add additional steps to our [Cloud Build](https://cloud.google.com/cloud-build/docs) pipeline. Please look at the updated pipeline `05-anthos_triggered_2.yaml` where we have added the **Check** and **Attest** step as well as necessary substitution variables.
+Now we are ready to add additional steps to our [Cloud Build](https://cloud.google.com/cloud-build/docs) pipeline. Please look at the updated pipeline `05-anthos_triggered_2.yaml` where we have added the `Check` and `Sign` step as well as necessary substitution variables.
 
 ```yaml
 # ...
@@ -379,7 +380,7 @@ Now we are ready to add additional steps to our [Cloud Build](https://cloud.goog
       /scripts/check_vulnerabilities.sh -p $PROJECT_ID -i gcr.io/$PROJECT_ID/$_IMAGE_NAME:$SHORT_SHA -t 5
 
 - name: gcr.io/$PROJECT_ID/cloudbuild-attestor
-  id: Attest
+  id: Sign
   entrypoint: sh
   args:
     - -xe
@@ -398,7 +399,7 @@ Now we are ready to add additional steps to our [Cloud Build](https://cloud.goog
 # ...
 ```
 
-## Try successful deployment
+## Try a successful deployment
 
 In order for the deployment to work we need to update our trigger. Make sure it now uses `05-anthos_triggered_2.yaml`. Push a new version to the repository and watch the [Cloud Build](https://cloud.google.com/cloud-build/docs) progress.
 
@@ -434,3 +435,103 @@ Error from server (Forbidden): pods "hello-server" is forbidden: image policy we
 ```
 
 In this case it is the [Binary Authorization](https://cloud.google.com/binary-authorization/docs) setup preventing the deployment.
+
+## Using the Kritis signer
+
+A newer solution to interpret the vularability scan results and execute the signing is to leverage the open source [Kritis](https://github.com/grafeas/kritis) project that can be used as a build step in [Cloud Build](https://cloud.google.com/cloud-build/docs). [This article](https://cloud.google.com/binary-authorization/docs/vulnerability-signing-kritis) describes the set up, which is very similar to what we have done so far. So, let's make a few changes in order to use the newer [Kritis](https://github.com/grafeas/kritis) signer.
+
+![alt text](docs/demo2b_flow.png)
+
+First, we need to create the [Kritis](https://github.com/grafeas/kritis) container image for [Cloud Build](https://cloud.google.com/cloud-build/docs). For convenience, the build step using [Cloud Build](https://cloud.google.com/cloud-build/docs) itself is included in the [Kritis](https://github.com/grafeas/kritis) repository.
+
+In a separate folder clone this repository:
+
+```bash
+git clone --branch signer-v1.0.0 https://github.com/grafeas/kritis.git
+```
+
+Build and push the container to our [Container Registry](https://cloud.google.com/container-registry/docs) by executing the following command from your new `kritis` folder:
+
+```bash
+gcloud --project=$PROJECT_ID builds submit . --config deploy/kritis-signer/cloudbuild.yaml
+```
+
+An image called `kritis-signer` should now be available in the project's [Container Registry](https://cloud.google.com/container-registry/docs) and can be used as a step in the build pipeline.
+
+The [Kritis signer](https://github.com/grafeas/kritis/blob/master/docs/signer.md) needs the full digest of the container, which is being created in the pipeline. To retrieve this full digest either a `docker` or `gcloud` command can be used. These commands are not available in the Kritis build step's container, so the value needs to be passed on from a previous step. In a Cloud Build pipeline this can be accomplished by storing the value in a file on a [volume](https://cloud.google.com/cloud-build/docs/build-config#volumes), which remains available during the entire pipeline.
+
+The first change is to the `Push` step in our pipeline. We use the same `docker` builder, but use bash as entry point in order to execute multiple `docker` commands:
+
+- Push the container to the registry
+- Store the full digest of the built container in a file called `image-digest.txt`:
+
+```yaml
+# Using an alternative "docker push" step in order to pass the full image digest to the next steps
+# The Kritis container has no docker, nor gcloud to get the full digest by itself
+- name: gcr.io/cloud-builders/docker
+  id: Push
+  entrypoint: /bin/bash
+  args:
+    - -c
+    - |
+      docker push gcr.io/$PROJECT_ID/$_IMAGE_NAME:$SHORT_SHA &&
+      docker image inspect gcr.io/$PROJECT_ID/$_IMAGE_NAME:$SHORT_SHA --format '{{index .RepoDigests 0}}' > image-digest.txt &&
+      cat image-digest.txt
+```
+
+The updated [Cloud Build](https://cloud.google.com/cloud-build/docs) pipeline, which uses the [Kritis signer](https://github.com/grafeas/kritis/blob/master/docs/signer.md) can be found in `06-anthos_triggered_3.yaml`.
+
+The second thing that needs to change is to replace the `Check` and `Sign` steps with a single new `Sign` step, which uses the [Kritis signer](https://github.com/grafeas/kritis/blob/master/docs/signer.md) container we created. This step does both the checking and signing.
+
+```yaml
+- name: gcr.io/$PROJECT_ID/kritis-signer
+  id: Sign
+  entrypoint: /bin/bash
+  args:
+    - -c
+    - |-
+      FQ_KMS_KEY="projects/${PROJECT_ID}/\
+      locations/${_KMS_LOCATION}/\
+      keyRings/${_KMS_KEYRING}/\
+      cryptoKeys/${_VULNZ_KMS_KEY}/\
+      cryptoKeyVersions/${_VULNZ_KMS_KEY_VERSION}"
+
+      /kritis/signer \
+      -v=10 \
+      -alsologtostderr \
+      -image=$(/bin/cat image-digest.txt) \
+      -policy=kritis-policies/policy-low.yaml \
+      -kms_key_name="$${FQ_KMS_KEY}" \
+      -kms_digest_alg=${_VULNZ_KMS_DIGEST_ALG} \
+      -note_name="projects/${PROJECT_ID}/notes/${_VULNZ_NOTE}"
+```
+
+Notice how the following inline bash command retrieves the full image digest from the file created in the previous build step.
+
+```bash
+  -image=$(/bin/cat image-digest.txt)
+```
+
+The signer also needs a full reference to the `KMS key` and the `Attestor Note`, so we construct those as can be seen above. To keep things organized, we add two new substitution variables:
+
+- `_VULNZ_KMS_DIGEST_ALG`: specifying the algorithm used for signing (we used SHA512)
+- `_KRITIS_POLICY`: specifies the Kritis policy file to use for processing the scanning results. An example of such policy looks like:
+
+```yaml
+apiVersion: kritis.grafeas.io/v1beta1
+kind: VulnzSigningPolicy
+metadata:
+  name: vulnz-medium
+spec:
+  imageVulnerabilityRequirements:
+    maximumFixableSeverity: MEDIUM
+    maximumUnfixableSeverity: MEDIUM
+    allowlistCVEs:
+      - projects/goog-vulnz/notes/CVE-2020-10543
+      - projects/goog-vulnz/notes/CVE-2020-10878
+      - projects/goog-vulnz/notes/CVE-2020-14155
+```
+
+In the folder `kritis-policies` we have included a _LOW_ and _Medium_ policy.
+
+That is it. Update the Cloud Build trigger using the updated pipeline `/cloudbuild/06-anthos_triggered_3.yaml`.

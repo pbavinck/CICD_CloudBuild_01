@@ -1,5 +1,5 @@
 # This build file can be used to manually deploy to Cloud Run on Anthos using
-#   gcloud builds submit --config="./cloudbuild/03-anthos_manual_1.yaml" 
+#   gcloud builds submit --config="./cloudbuild/03-anthos_manual.yaml" 
 
 timeout: '120s'
 

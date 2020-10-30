@@ -1,3 +1,5 @@
+# Build file for being executed using a trigger based on repo commit (using $SHORT_SHA)
+# It uses custom scripts as described at https://cloud.google.com/solutions/binary-auth-with-cloud-build-and-gke#creating_the_vulnerability_scan_checker_and_enabling_the_api
 timeout: '300s'
 
 options:
@@ -9,7 +11,6 @@ options:
 substitutions:
   _IMAGE_NAME: cloudrun_anthos_demo
   _SERVICE_NAME: anthos-demo
-  _TRAFFIC_SPLIT: "100"
   _KMS_KEYRING: binauthz
   _KMS_LOCATION: europe-west1
   _VULNZ_ATTESTOR: vulnz-attestor
@@ -46,7 +47,7 @@ steps:
     /scripts/check_vulnerabilities.sh -p $PROJECT_ID -i gcr.io/$PROJECT_ID/$_IMAGE_NAME:$SHORT_SHA -t 5
 
 - name: gcr.io/$PROJECT_ID/cloudbuild-attestor
-  id: Attest
+  id: Sign
   entrypoint: sh
   args:
   - -xe
