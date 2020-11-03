@@ -25,6 +25,18 @@ These demos require the following Google Cloud API's to be enabled:
 - [Cloud Build](https://cloud.google.com/cloud-build/docs) API
 - [Cloud Run](https://cloud.google.com/run/docs) API
 
+You can check if the APIs are enabled like this:
+```bash
+gcloud services list --enabled --filter="config.name:('cloudbuild.googleapis.com', 'run.googleapis.com')"
+```
+
+Output should be similar to:
+```bash
+NAME                       TITLE
+cloudbuild.googleapis.com  Cloud Build API
+run.googleapis.com         Cloud Run Admin API
+```
+
 Also, please make sure that the [Cloud Build](https://cloud.google.com/cloud-build/docs) service account (<proj-number>@cloudbuild.gserviceaccount.com) has the following roles:
 
 - Service Account User (roles/iam.serviceAccountUser)
@@ -37,6 +49,15 @@ gcloud projects get-iam-policy $PROJECT_ID \
 --flatten="bindings[].members" \
 --format='table(bindings.role)' \
 --filter="bindings.members:$CLOUD_BUILD_SA_EMAIL"
+```
+
+Output should be similar to:
+```bash
+ROLE
+roles/cloudbuild.builds.builder
+roles/container.developer
+roles/iam.serviceAccountUser
+roles/run.admin
 ```
 
 # DEMO 1: Cloud Build to managed Cloud Run
