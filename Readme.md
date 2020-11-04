@@ -268,7 +268,7 @@ gcloud kms keys create "vulnz-signer" \
 
 ## Signing rights
 
-When [Cloud Build](https://cloud.google.com/cloud-build/docs) wants to sign an image (create an attestation in the script 'create*attestaion.sh') the associated [gcloud command](https://cloud.google.com/sdk/gcloud/reference/alpha/container/binauthz/attestations/sign-and-create) requires the Attestor resource as one of its parameters. The command needs to verify the existence of the Attestor and retrieve its information. Therefore we give it the role \_attestorsViewer* on the Attestor resource `vulnz-attestor`:
+When [Cloud Build](https://cloud.google.com/cloud-build/docs) wants to sign an image (create an attestation in the script 'create_attestaion.sh') the associated [gcloud command](https://cloud.google.com/sdk/gcloud/reference/alpha/container/binauthz/attestations/sign-and-create) requires the Attestor resource as one of its parameters. The command needs to verify the existence of the Attestor and retrieve its information. Therefore we give it the role *attestorsViewer* on the Attestor resource `vulnz-attestor`:
 
 ```bash
 gcloud container binauthz attestors add-iam-policy-binding "vulnz-attestor" \
