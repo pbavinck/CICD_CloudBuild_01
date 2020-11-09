@@ -9,17 +9,6 @@ Please note that the content of this repository is not an officially supported G
 
 # Setup
 
-These demos require the following Google Cloud API's to be enabled:
-
-- [Cloud Build](https://cloud.google.com/cloud-build/docs) API
-- [Cloud Run](https://cloud.google.com/run/docs) API
-
-Also, please make sure that the [Cloud Build](https://cloud.google.com/cloud-build/docs) service account (proj-number@cloudbuild.gserviceaccount.com) has the following roles:
-
-- Service Account User
-- Cloud Run Admin
-- Kubernetes Engine Admin
-
 In these instruction we will use environment variables to refer to the right project, region, cluster, etc.. After you have activated the right project for `gcloud`, update the following environmnet variables to your situation and set them using the following commands:
 
 ```bash
@@ -29,6 +18,46 @@ export CLOUD_BUILD_SA_EMAIL="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 export REGION=europe-west1
 export ZONE=europe-west1-c
 export CLUSTER=ci-cd-demo
+```
+
+These demos require the following Google Cloud API's to be enabled:
+
+- [Cloud Build](https://cloud.google.com/cloud-build/docs) API
+- [Cloud Run](https://cloud.google.com/run/docs) API
+
+You can check if the APIs are enabled like this:
+```bash
+gcloud services list --enabled --filter="config.name:('cloudbuild.googleapis.com', 'run.googleapis.com')"
+```
+
+Output should be similar to:
+```bash
+NAME                       TITLE
+cloudbuild.googleapis.com  Cloud Build API
+run.googleapis.com         Cloud Run Admin API
+```
+
+Also, please make sure that the [Cloud Build](https://cloud.google.com/cloud-build/docs) service account (<proj-number>@cloudbuild.gserviceaccount.com) has the following roles:
+
+- Service Account User (roles/iam.serviceAccountUser)
+- Cloud Run Admin (roles/run.admin)
+- Kubernetes Engine Admin (roles/container.admin)
+
+You can list the roles of the service account like this:
+```bash
+gcloud projects get-iam-policy $PROJECT_ID \
+--flatten="bindings[].members" \
+--format='table(bindings.role)' \
+--filter="bindings.members:$CLOUD_BUILD_SA_EMAIL"
+```
+
+Output should be similar to:
+```bash
+ROLE
+roles/cloudbuild.builds.builder
+roles/container.developer
+roles/iam.serviceAccountUser
+roles/run.admin
 ```
 
 # DEMO 1: Cloud Build to managed Cloud Run
@@ -239,7 +268,7 @@ gcloud kms keys create "vulnz-signer" \
 
 ## Signing rights
 
-When [Cloud Build](https://cloud.google.com/cloud-build/docs) wants to sign an image (create an attestation in the script 'create*attestaion.sh') the associated [gcloud command](https://cloud.google.com/sdk/gcloud/reference/alpha/container/binauthz/attestations/sign-and-create) requires the Attestor resource as one of its parameters. The command needs to verify the existence of the Attestor and retrieve its information. Therefore we give it the role \_attestorsViewer* on the Attestor resource `vulnz-attestor`:
+When [Cloud Build](https://cloud.google.com/cloud-build/docs) wants to sign an image (create an attestation in the script 'create_attestaion.sh') the associated [gcloud command](https://cloud.google.com/sdk/gcloud/reference/alpha/container/binauthz/attestations/sign-and-create) requires the Attestor resource as one of its parameters. The command needs to verify the existence of the Attestor and retrieve its information. Therefore we give it the role *attestorsViewer* on the Attestor resource `vulnz-attestor`:
 
 ```bash
 gcloud container binauthz attestors add-iam-policy-binding "vulnz-attestor" \
