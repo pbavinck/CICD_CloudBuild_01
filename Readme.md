@@ -116,7 +116,7 @@ The second demo focusses on
 
 The setup is a simplified version of [this demo](https://cloud.google.com/solutions/binary-auth-with-cloud-build-and-gke). Instead of a staging and production cluster we are using a simplified version with only one GKE cluster.
 
-![alt text](docs/demo2a_flow.png)
+![demo 2a flow](docs/demo2a_flow.png)
 
 Like before, we start by doing the deployment step by step manually, followed by an automated pipeline powered by [Cloud Build](https://cloud.google.com/cloud-build/docs).
 
@@ -440,7 +440,7 @@ In this case it is the [Binary Authorization](https://cloud.google.com/binary-au
 
 A newer solution to interpret the vularability scan results and execute the signing is to leverage the open source [Kritis](https://github.com/grafeas/kritis) project that can be used as a build step in [Cloud Build](https://cloud.google.com/cloud-build/docs). [This article](https://cloud.google.com/binary-authorization/docs/vulnerability-signing-kritis) describes the set up, which is very similar to what we have done so far. So, let's make a few changes in order to use the newer [Kritis](https://github.com/grafeas/kritis) signer.
 
-![alt text](docs/demo2b_flow.png)
+![demo 2b flow](docs/demo2b_flow.png)
 
 First, we need to create the [Kritis](https://github.com/grafeas/kritis) container image for [Cloud Build](https://cloud.google.com/cloud-build/docs). For convenience, the build step using [Cloud Build](https://cloud.google.com/cloud-build/docs) itself is included in the [Kritis](https://github.com/grafeas/kritis) repository.
 
